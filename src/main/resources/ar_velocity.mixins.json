@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "arvelocity.mixin",
+  "plugin": "arvelocity.ArVelocityMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "acceleratedrendering.AcceleratedBufferBuilderVelocityMixin",
+    "acceleratedrendering.DecoratedRendererAccessor",
+    "acceleratedrendering.LoadComputeShaderEventMixin",
+    "acceleratedrendering.MeshUploadingProgramDispatcherVelocityMixin",
+    "acceleratedrendering.RingBuffersVelocityMixin",
+    "acceleratedrendering.SheetedDecalTextureRendererAccessor",
+    "acceleratedrendering.TransformProgramDispatcherVelocityMixin",
+    "acceleratedrendering.VertexArrayAccessor",
+    "vanilla.BlockEntityRenderDispatcherOwnerMixin",
+    "vanilla.EntityRenderDispatcherOwnerMixin",
+    "vanilla.GameRendererFrameMixin",
+    "vanilla.LevelRendererFrameMixin",
+    "vanilla.ShaderInstanceVelocityMixin",
+    "vanilla.VelocityHistoryHolderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

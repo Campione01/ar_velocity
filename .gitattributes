@@ -1,0 +1,11 @@
+# Text is stored and checked out with LF line endings.
+* text=auto eol=lf
+
+# Everything under src/main is stored byte for byte: the released jar is built from exactly these files, and the
+# two compute shaders keep the CRLF line endings (no newline at the end of the file) of the Accelerated Rendering
+# originals they are modified copies of. build.py refuses shaders whose bytes differ.
+/src/main/** -text
+
+*.jar binary
+*.class binary
+*.png binary

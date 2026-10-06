@@ -1,0 +1,55 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "GPL-3.0"
+
+[[mods]]
+modId = "ar_velocity"
+version = "0.1.3"
+displayName = "AR Velocity"
+credits = "187J3X1-114514, author of Super Resolution and of the original Iris velocity extension; Argon4W, author of Accelerated Rendering (MIT License), two of whose Iris entity compute shaders are modified here"
+description = '''
+Adds the per-vertex motion vector attribute at_velocity to what Accelerated Rendering draws through its
+compute shaders with an Iris shader pack that reads it: entities, block entities and the items they carry.
+No vertex format is changed: the motion vectors live in a buffer of their own that is attached to vertex
+attribute 9. With a shader pack that does not read the attribute Accelerated Rendering is left as it is.
+Client only. Needs Accelerated Rendering 1.0.14 and Iris. Start with -Darvelocity.disable=true to switch it off.
+'''
+
+[[mixins]]
+config = "ar_velocity.mixins.json"
+
+[[dependencies.ar_velocity]]
+modId = "acceleratedrendering"
+type = "required"
+versionRange = "[1.0.14-1.21.1-alpha]"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.ar_velocity]]
+modId = "iris"
+type = "required"
+versionRange = "[1.8,)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.ar_velocity]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.ar_velocity]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1]"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.ar_velocity]]
+modId = "at_velocity_port"
+type = "incompatible"
+reason = "at_velocity_port feeds the same vertex attribute by changing the Iris entity vertex format; use only one of the two."
+versionRange = "[0,)"
+ordering = "NONE"
+side = "CLIENT"
