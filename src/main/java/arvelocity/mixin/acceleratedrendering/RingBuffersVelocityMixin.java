@@ -117,14 +117,16 @@ public abstract class RingBuffersVelocityMixin implements VelocityRing {
     }
 
     @Override
-    public boolean arvelocity$withdraw(long entry) {
-        long offset = entry & 0xFFFFFFFFL;
-        if (entry < 0L || (int) (entry >>> 32) != this.arvelocity$serial || this.arvelocity$sealed
-                || offset + VelocityDeltas.ENTRY_SIZE > this.sharingBuffer.getPosition()) {
-            return false;
+    public boolean arvelocity$open(long entry) {
+        return entry >= 0L && (int) (entry >>> 32) == this.arvelocity$serial && !this.arvelocity$sealed
+                && (entry & 0xFFFFFFFFL) + VelocityDeltas.ENTRY_SIZE <= this.sharingBuffer.getPosition();
+    }
+
+    @Override
+    public void arvelocity$withdraw(long entry) {
+        if (this.arvelocity$open(entry)) {
+            VelocityDeltas.clear(this.sharingBuffer.addressAt(entry & 0xFFFFFFFFL));
         }
-        VelocityDeltas.clear(this.sharingBuffer.addressAt(offset));
-        return true;
     }
 
     // The end of a cycle: the builders are gone, the next ones ask again.

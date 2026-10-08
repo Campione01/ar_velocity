@@ -4,7 +4,7 @@ license = "GPL-3.0"
 
 [[mods]]
 modId = "ar_velocity"
-version = "0.1.3"
+version = "0.1.4"
 displayName = "AR Velocity"
 credits = "187J3X1-114514, author of Super Resolution and of the original Iris velocity extension; Argon4W, author of Accelerated Rendering (MIT License), two of whose Iris entity compute shaders are modified here"
 description = '''

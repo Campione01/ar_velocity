@@ -51,6 +51,21 @@ import java.util.Arrays;
  * draw, and where that goes against it the motion vector it was given is taken back
  * ({@link VelocityRing#arvelocity$withdraw}).
  *
+ * That can be done until the compute programs are given the draws. What a renderer draws after that is another
+ * compute cycle of the frame. Every draw is still looked for among all draws of the frame before, whichever
+ * cycle they were made in: where a cycle ends may differ from frame to frame. Only the rule for the single
+ * draw goes by cycles: the first draw of a cycle is the only draw of the same cycle of the frame before, for
+ * the time being, and a second draw of that cycle takes it back, which it always can. A draw of a later cycle
+ * cannot. When it turns out to be the one the state belonged to, the first draw of an earlier cycle was a new
+ * thing drawn at an earlier point of the frame than the old one, and has a false motion vector in that frame;
+ * its renderer is held to the rules for several draws from then on ({@link #refused}).
+ *
+ * A single draw that is too far for the rules among several draws is the same thing that went far, or another
+ * thing in its stead: where it is does not tell. For an item the draw may say which stack it is made for. A
+ * stack that was the same object in two frames running and is another one now is taken for another thing,
+ * unless it is the stack that was there, changed ({@link Things}); a stack that is new in every frame says
+ * nothing, and neither does a draw that names none, like that of a model part.
+ *
  * Distances are per frame, and frames differ in length: a state is expected to go on as far as it went, or
  * as far as that comes to in a frame of this length ({@link #ratio}).
  */
@@ -66,8 +81,9 @@ public final class VelocityHistory {
      * up only for one that explains the draw better by more than this; a state that has a displacement of its
      * own is not taken by a draw that would change that displacement by more than this and by more than twice
      * its length (a stop is once, a bounce twice), nor, where the displacement is stretched to the length of
-     * the frame, by more than this and more than once its length; and a state without one is not taken at once
-     * by a draw further from it than this.
+     * the frame, by more than this and more than once its length; in a frame that is shorter than the one
+     * before, both by more than this and more than twice what the displacement comes to in it; and a state
+     * without one is not taken at once by a draw further from it than this.
      */
     public static final float AMBIGUITY = 0.5f;
 
@@ -84,8 +100,17 @@ public final class VelocityHistory {
     public static final float MIN_RATIO = 0.125f;
     public static final float MAX_RATIO = 8.0f;
 
-    /** Nanoseconds. A frame that begins this long after the one before it is not paired with it. */
+    /** Nanoseconds of real time. A frame that begins this long after the one before it is not paired with it. */
     public static final long PAUSE = 1_000_000_000L;
+
+    /** Knows what the objects are that draws name as what they are made for. */
+    public interface Things {
+        /**
+         * True when the object a draw names is what the object of the frame before has become: the same thing,
+         * changed. Asked only for two different objects.
+         */
+        boolean same(Object before, Object now);
+    }
 
     static final int NEVER = Integer.MIN_VALUE;
 
@@ -116,9 +141,12 @@ public final class VelocityHistory {
         // How far the origin went in the world since the state this one was compared with; zero while FRESH.
         float dx, dy, dz;
         int status;
-        // While this is a state of the previous frame: a draw was paired with it; and the draw whose
-        // UNCONFIRMED displacement was measured from it.
+        // Which compute cycle of its frame the draw was made in, counted from the first in which the renderer drew.
+        int cycle;
+        // While this is a state of the previous frame: a draw was paired with it; it was as the only draw of
+        // its cycle, which still stands; and the draw whose UNCONFIRMED displacement was measured from it.
         boolean taken;
+        boolean single;
         State guess;
     }
 
@@ -131,10 +159,19 @@ public final class VelocityHistory {
         int currentCount;
         /** Index of the last state taken, minus the index of the draw that took it. */
         int shift;
-        /** Where the delta entry of the first draw of the frame is, while that draw is paired only as the single draw of its renderer. */
-        VelocityRing pending;
-        long pendingEntry;
-        /** A delta entry of this renderer could not be taken back any more: its first draw is not paired like that again. */
+        /** The compute cycle of the frame that is being drawn, and the index of its first draw. */
+        int cycle;
+        int start;
+        /** Where the delta entry of the first draw of that cycle is, as long as it is known. */
+        VelocityRing ring;
+        long entry;
+        /** The first draw of that cycle is paired only as the single draw of its cycle, with the state at this index. */
+        boolean pending;
+        int only;
+        /** What the first draw of the frame was made for, and whether that was the same in the frame before it. */
+        Object thing;
+        boolean steady;
+        /** A first draw that was paired like that turned out to be another thing when it could no longer be taken back: none is paired like that again. */
         boolean late;
     }
 
@@ -143,6 +180,7 @@ public final class VelocityHistory {
     private static final ArrayList<WeakReference<VelocityHistory>> ALL = new ArrayList<>();
 
     private static long examined;
+    private static long cycles;
     private static long refused;
 
     private final Reference2ObjectOpenHashMap<Object, Track> tracks = new Reference2ObjectOpenHashMap<>();
@@ -152,14 +190,15 @@ public final class VelocityHistory {
     }
 
     /**
-     * The ratio {@link #pair} takes, from the length in nanoseconds of the frame that is being drawn and of the
-     * one before it (not positive: not known): 1 when one of the two is not known, 0 for a frame after a pause.
+     * The ratio {@link #pair} takes, from the length of the frame that is being drawn and of the one before it
+     * (in any unit, the game's own time for one; not positive: not known) and from the real time in nanoseconds
+     * since the frame before began: 0 after a pause, 1 when one of the two lengths is not known.
      */
-    public static float ratio(long duration, long before) {
-        if (duration > PAUSE) {
+    public static float ratio(long duration, long before, long real) {
+        if (real > PAUSE) {
             return 0.0f;
         }
-        if (duration <= 0L || before <= 0L || before > PAUSE) {
+        if (duration <= 0L || before <= 0L) {
             return 1.0f;
         }
         return Math.min(Math.max((float) ((double) duration / (double) before), MIN_RATIO), MAX_RATIO);
@@ -170,7 +209,7 @@ public final class VelocityHistory {
      * it, or null when the draw has no history: nothing of this renderer was drawn in that frame (a longer gap
      * counts as none), the draw is new, or what it would be paired with is not plausibly the same thing.
      *
-     * What is returned for the first draw of a frame may be taken back by the second: see {@link VelocityRing#arvelocity$withdraw}.
+     * What is returned for the first draw of a compute cycle may be taken back by the second: see {@link VelocityRing#arvelocity$withdraw}.
      *
      * @param modelToView M * P of the draw
      * @param pose        P of the draw
@@ -178,29 +217,45 @@ public final class VelocityHistory {
      * @param ratio       the length of this frame over that of the frame before it, see {@link #ratio}
      * @param ring        where the delta entry of the draw is written, or null when it cannot be taken back later
      * @param address     the address of that entry now
+     * @param thing       what the draw is made for, when the draw says (the stack of an item), or null
+     * @param things      what knows such objects, or null when every other object is another thing
      */
     public Matrix4f pair(Object renderer, int frame, Matrix4f modelToView, Matrix4f pose, float cameraDx, float cameraDy, float cameraDz,
-                         float ratio, VelocityRing ring, long address) {
+                         float ratio, VelocityRing ring, long address, Object thing, Things things) {
         Track track = tracks.get(renderer);
         if (track == null) {
             tracks.put(renderer, track = new Track());
         }
         if (track.frame != frame) {
-            State[] spare = track.previous;
-            track.previous = track.current;
-            track.previousCount = track.frame == frame - 1 ? track.currentCount : 0;
-            track.current = spare;
-            track.currentCount = 0;
-            track.shift = 0;
-            track.frame = frame;
-            track.pending = null;
+            begin(track, frame);
+        } else if (track.ring != null && !track.ring.arvelocity$open(track.entry)) {
+            // The compute programs have been given what the renderer drew so far: this draw begins another cycle of the frame.
+            track.cycle++;
+            track.start = track.currentCount;
+            track.pending = false;
+            track.ring = null;
+            cycles++;
         }
         int index = track.currentCount;
         if (index >= MAX_DRAWS) {
             return null;
         }
-        if (index == 1 && track.pending != null) {
+        boolean first = index == track.start;
+        if (index == track.start + 1 && track.pending) {
             withdraw(track);
+        }
+        if (first) {
+            long entry = ring == null ? -1L : ring.arvelocity$entry(address);
+            if (entry >= 0L) {
+                track.ring = ring;
+                track.entry = entry;
+            }
+        }
+        boolean replaced = false;
+        if (index == 0) {
+            replaced = track.steady && thing != track.thing && !(thing != null && things != null && things.same(track.thing, thing));
+            track.steady = thing != null && thing == track.thing;
+            track.thing = thing;
         }
         State now = slot(track, index);
         track.currentCount = index + 1;
@@ -221,7 +276,9 @@ public final class VelocityHistory {
         now.dy = 0.0f;
         now.dz = 0.0f;
         now.status = FRESH;
+        now.cycle = track.cycle;
         now.taken = false;
+        now.single = false;
         now.guess = null;
 
         int count = track.previousCount;
@@ -294,7 +351,10 @@ public final class VelocityHistory {
         float speed = match.dx * match.dx + match.dy * match.dy + match.dz * match.dz;
         boolean plausible;
         if (match.status == TRACKED) {
-            plausible = change <= Math.max(AMBIGUITY * AMBIGUITY, 4.0f * speed) || stretched <= Math.max(AMBIGUITY * AMBIGUITY, speed * stretch * stretch);
+            // After a longer frame the displacement is that of the longer frame: twice as far is twice what is left of it in this one.
+            float stride = speed * stretch * stretch;
+            plausible = change <= Math.max(AMBIGUITY * AMBIGUITY, 4.0f * Math.min(speed, stride))
+                    || stretched <= Math.max(AMBIGUITY * AMBIGUITY, stretch < 1.0f ? 4.0f * stride : stride);
         } else if (matchIndex == expected) {
             plausible = jump <= AMBIGUITY * AMBIGUITY || (match.status == UNCONFIRMED && Math.min(change, stretched) <= AMBIGUITY * AMBIGUITY);
         } else {
@@ -304,15 +364,18 @@ public final class VelocityHistory {
             plausible = !open && jump + turned(now, match) <= AMBIGUITY * AMBIGUITY;
         }
         boolean alone = false;
+        boolean single = false;
         // The guess of a draw that was not paired is not how far anything went.
         float went = match.status == UNCONFIRMED ? 0.0f : speed;
-        if (!plausible && index == 0 && count == 1 && ring != null && !track.late
+        if (!plausible && first && matchIndex == expected && !match.taken && match.cycle == track.cycle && only(previous, count, matchIndex)
+                && track.ring != null && !track.late && !replaced
                 && jump <= Math.max(SINGLE_REACH * SINGLE_REACH, SINGLE_GROWTH * SINGLE_GROWTH * went * stretch * stretch)) {
-            // One draw then and, so far, one now: the same draw. A second draw of this frame takes this back.
-            track.pending = ring;
-            track.pendingEntry = ring.arvelocity$entry(address);
+            // One draw in this cycle of the frame then and, so far, one now: the same draw. A second draw of this cycle takes this back.
+            track.pending = true;
+            track.only = matchIndex;
             // Unless it goes on as it went when it was paired like this the frame before: that is how it moves, then.
             alone = !(match.status == ALONE && Math.min(change, stretched) <= AMBIGUITY * AMBIGUITY);
+            single = true;
             plausible = true;
         }
         if (!plausible) {
@@ -328,7 +391,14 @@ public final class VelocityHistory {
             }
             return null;
         }
+        if (match.single && !track.late) {
+            // The state goes on in this draw, and the first draw of an earlier cycle has it as the only draw of
+            // that cycle: that one was a new thing, and its vertices are with the compute programs.
+            track.late = true;
+            refused++;
+        }
         match.taken = true;
+        match.single |= single;
         State guessed = match.guess;
         if (guessed != null) {
             // The state went on in this draw, so the draw that might have been its draw is a new one.
@@ -346,12 +416,39 @@ public final class VelocityHistory {
         return match.modelToView;
     }
 
-    // The first draw of the frame was paired as the only draw of its renderer, against the rules every other
-    // draw is held to, and now there is a second one: the first is left as those rules leave it.
+    // The draws of a renderer in the given frame begin: those it made in the frame before are what they are paired with.
+    private static void begin(Track track, int frame) {
+        State[] spare = track.previous;
+        track.previous = track.current;
+        boolean follows = track.frame == frame - 1;
+        track.previousCount = follows ? track.currentCount : 0;
+        track.current = spare;
+        track.currentCount = 0;
+        track.shift = 0;
+        track.frame = frame;
+        track.cycle = 0;
+        track.start = 0;
+        track.pending = false;
+        track.ring = null;
+        if (!follows) {
+            track.thing = null;
+        }
+    }
+
+    /** The state at the index is that of the only draw the renderer made in its compute cycle. */
+    private static boolean only(State[] states, int count, int index) {
+        int cycle = states[index].cycle;
+        return (index == 0 || states[index - 1].cycle != cycle) && (index + 1 >= count || states[index + 1].cycle != cycle);
+    }
+
+    // The first draw of the cycle was paired as the only draw of its cycle, against the rules every other
+    // draw is held to, and now there is a second one: the first is left as those rules leave it. Its entry
+    // is within reach, or the second draw would have begun another cycle.
     private static void withdraw(Track track) {
-        State first = track.current[0];
-        State only = track.previous[0];
+        State first = track.current[track.start];
+        State only = track.previous[track.only];
         only.taken = false;
+        only.single = false;
         if (only.status != TRACKED) {
             first.status = UNCONFIRMED;
             only.guess = first;
@@ -361,11 +458,8 @@ public final class VelocityHistory {
             first.dz = 0.0f;
             first.status = FRESH;
         }
-        if (!track.pending.arvelocity$withdraw(track.pendingEntry)) {
-            track.late = true;
-            refused++;
-        }
-        track.pending = null;
+        track.ring.arvelocity$withdraw(track.entry);
+        track.pending = false;
     }
 
     private static State slot(Track track, int index) {
@@ -427,7 +521,12 @@ public final class VelocityHistory {
         return examined;
     }
 
-    /** First draws whose motion vector could not be taken back any more when a second draw followed, since the start. */
+    /** Times a renderer went on drawing for an owner in another compute cycle of a frame, since the start, over all histories. */
+    public static long cycles() {
+        return cycles;
+    }
+
+    /** First draws of a compute cycle whose motion vector turned out to be another draw's when it could no longer be taken back, since the start. */
     public static long refused() {
         return refused;
     }

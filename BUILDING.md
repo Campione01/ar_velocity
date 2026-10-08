@@ -17,13 +17,13 @@ Only the Windows x64 natives are taken from the manifest, and the script has onl
 
 1. Copy `build.example.json` to `build.local.json` and enter your paths. A path is absolute or relative to this folder; forward slashes work on Windows. The entry `_about` only explains the others and may stay or go. `build.local.json` is ignored by git.
 2. Run `python build.py` (or `python build.py --quiet`).
-3. The mod is `out/ar_velocity-0.1.3.jar`.
+3. The mod is `out/ar_velocity-0.1.4.jar`.
 
 The script reads its inputs and writes only into `out/` and `work/` of this folder. Keep the repository in a folder whose path has ASCII characters only: javac is handed the list of sources in a file, which it reads in the platform code page.
 
 ## Reproducing The Released Jar
 
-`ar_velocity-0.1.3.jar` (68,441 bytes, SHA-256 `f44b456c387fab4353eb8fe6f4a0670e9e342e11a9a16045e2277164b09c7aba`) was built from these sources with javac 21.0.11 against NeoForge 21.1.227, Accelerated Rendering 1.0.14-1.21.1-alpha and a snapshot build of Iris 1.8.13. With the same inputs `build.py` produces the same 39 files byte for byte, the manifest included; the jar file itself differs, because every entry carries the time it was written.
+`ar_velocity-0.1.4.jar` (74,196 bytes, SHA-256 `091dc165f34c37d63f20edeb8534be37d1abdcfa49eeab44e543e7284bb82ea5`) was built from these sources with javac 21.0.11 against NeoForge 21.1.227, Accelerated Rendering 1.0.14-1.21.1-alpha and a snapshot build of Iris 1.8.13. With the same inputs `build.py` produces the same 41 files byte for byte, the manifest included; the jar file itself differs, because every entry carries the time it was written.
 
 ## Shaders
 

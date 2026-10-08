@@ -35,15 +35,22 @@ public interface VelocityRing {
     boolean arvelocity$writesVelocities();
 
     /**
-     * A number for the entry of the per-draw transform buffer that is at this address now, to take the entry
-     * back with. The address itself does not last: the buffer is mapped again, elsewhere, whenever it grows.
+     * A number for the entry of the per-draw transform buffer that is at this address now, to find the entry
+     * again with; negative when there is no such entry. The address itself does not last: the buffer is mapped
+     * again, elsewhere, whenever it grows.
      */
     long arvelocity$entry(long address);
 
     /**
-     * Zeroes the delta entry with that number, which leaves its draw without a motion vector. False, and
-     * nothing is written, when the entry is beyond reach: the compute programs of its cycle have been given
-     * the buffer, or the cycle is over and the memory holds the entries of another one.
+     * True as long as the entry with that number can be changed: the cycle it was written in is still being
+     * filled. False once the compute programs of that cycle have been given the buffer, and from then on: the
+     * memory holds the entries of other cycles after that.
      */
-    boolean arvelocity$withdraw(long entry);
+    boolean arvelocity$open(long entry);
+
+    /**
+     * Zeroes the delta entry with that number, which leaves its draw without a motion vector. Nothing is
+     * written for an entry that is not open.
+     */
+    void arvelocity$withdraw(long entry);
 }

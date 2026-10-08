@@ -21,7 +21,7 @@ import zipfile
 from pathlib import Path
 
 MOD_ID = "ar_velocity"
-VERSION = "0.1.3"
+VERSION = "0.1.4"
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src" / "main" / "java"

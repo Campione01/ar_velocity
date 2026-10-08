@@ -19,7 +19,6 @@
 
 package arvelocity.mixin.acceleratedrendering;
 
-import arvelocity.ArVelocity;
 import arvelocity.VelocityShaders;
 import arvelocity.VelocitySidecar;
 import com.github.argon4w.acceleratedrendering.core.backends.programs.BarrierFlags;
@@ -54,6 +53,7 @@ public abstract class LoadComputeShaderEventMixin {
         this.arvelocity$added = true;
         this.loadComputeShader(VelocityShaders.TRANSFORM_KEY, VelocityShaders.TRANSFORM_FILE, BarrierFlags.SHADER_STORAGE);
         this.loadComputeShader(VelocityShaders.UPLOADING_KEY, VelocityShaders.UPLOADING_FILE, BarrierFlags.SHADER_STORAGE);
-        ArVelocity.LOGGER.info("ar_velocity: compute programs {} and {} are loaded next to those of Accelerated Rendering", VelocityShaders.TRANSFORM_KEY, VelocityShaders.UPLOADING_KEY);
+        // This is a thread that loads resources: the thread that draws says it (VelocitySidecar.announce).
+        VelocitySidecar.programsListed();
     }
 }

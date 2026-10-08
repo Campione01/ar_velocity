@@ -60,6 +60,13 @@ public final class VelocitySidecar {
 
     private static volatile Boolean supported;
 
+    // Set by the thread that loads the resources, read by the one that draws.
+    private static volatile boolean programsListed;
+    private static boolean announced;
+
+    // Why nothing writes velocities, from whichever thread found it, until the thread that draws has said it.
+    private static volatile String refusal;
+
     private static VertexLayout velocityLayout;
     private static VertexLayout otherLayout;
 
@@ -91,19 +98,42 @@ public final class VelocitySidecar {
         try {
             entity = IrisVertexFormats.ENTITY;
         } catch (LinkageError e) {
-            ArVelocity.LOGGER.error("ar_velocity: inactive, no motion vectors; the installed Iris does not have what this build was made for: {}", e.toString());
+            refusal = "ar_velocity: inactive, no motion vectors; the installed Iris does not have what this build was made for: " + e;
             return false;
         }
         boolean fits = entity.getVertexSize() == VERTEX_SIZE && entity.getElements().size() <= ATTRIBUTE;
-        if (fits) {
-            ArVelocity.LOGGER.info("ar_velocity: active; {} is vertex attribute {}, fed from a per-vertex buffer (shader storage binding {}) that two programs "
-                    + "of this mod write in the place of the Iris entity transform and mesh uploading programs of Accelerated Rendering, while a shader pack "
-                    + "program reads the attribute", ATTRIBUTE_NAME, ATTRIBUTE, OUTPUT_BINDING);
-        } else {
-            ArVelocity.LOGGER.error("ar_velocity: inactive; expected the {}-byte Iris entity vertex format of Accelerated Rendering 1.0.14 with at most {} "
-                    + "elements, found {} bytes and {} elements\n{}", VERTEX_SIZE, ATTRIBUTE, entity.getVertexSize(), entity.getElements().size(), entity);
+        if (!fits) {
+            refusal = "ar_velocity: inactive, no motion vectors; expected the " + VERTEX_SIZE + "-byte Iris entity vertex format of Accelerated Rendering 1.0.14 "
+                    + "with at most " + ATTRIBUTE + " elements, found " + entity.getVertexSize() + " bytes and " + entity.getElements().size() + " elements\n" + entity;
         }
         return fits;
+    }
+
+    /** The two programs of this mod are in the list Accelerated Rendering compiles its programs from. Called on whichever thread loads the resources. */
+    public static void programsListed() {
+        programsListed = true;
+    }
+
+    /**
+     * Says that the mod is active, once, in the first frame of the game after its programs were listed, or why
+     * it is not, in the first frame after that was found, on the thread that draws: a line that is logged
+     * while the resources load, by one of the threads that load them, is not sure to reach the log.
+     */
+    public static void announce() {
+        String reason = refusal;
+        if (reason != null) {
+            refusal = null;
+            ArVelocity.LOGGER.error(reason);
+        }
+        if (announced || !programsListed) {
+            return;
+        }
+        announced = true;
+        ArVelocity.LOGGER.info("ar_velocity: active; {} is vertex attribute {}, fed from a per-vertex buffer (shader storage binding {}) that two programs "
+                + "of this mod write in the place of the Iris entity transform and mesh uploading programs of Accelerated Rendering, while a shader pack "
+                + "program reads the attribute", ATTRIBUTE_NAME, ATTRIBUTE, OUTPUT_BINDING);
+        ArVelocity.LOGGER.info("ar_velocity: compute programs {} and {} are loaded next to those of Accelerated Rendering", VelocityShaders.TRANSFORM_KEY,
+                VelocityShaders.UPLOADING_KEY);
     }
 
     public static void announceBuffer() {

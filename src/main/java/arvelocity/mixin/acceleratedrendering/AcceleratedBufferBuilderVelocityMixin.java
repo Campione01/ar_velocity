@@ -80,12 +80,12 @@ public abstract class AcceleratedBufferBuilderVelocityMixin implements VelocityW
         }
     }
 
-    // doRender is where the renderer object (model part, bone, baked model) of a draw is known.
+    // doRender is where the renderer object (model part, bone, baked model) of a draw is known, and what it draws with.
     @Inject(method = "doRender", at = @At("HEAD"))
     private void arvelocity$enterRenderer(IAcceleratedRenderer<?> renderer, Object context, Matrix4f transform, Matrix3f normal, int light, int overlay,
                                           int color, CallbackInfo ci) {
         if (this.arvelocity$writesVelocities() && RenderSystem.isOnRenderThread()) {
-            VelocityContext.pushRenderer(renderer);
+            VelocityContext.pushRenderer(renderer, context);
         }
     }
 

@@ -7,6 +7,7 @@
   "client": [
     "acceleratedrendering.AcceleratedBufferBuilderVelocityMixin",
     "acceleratedrendering.DecoratedRendererAccessor",
+    "acceleratedrendering.ItemLayerColorsAccessor",
     "acceleratedrendering.LoadComputeShaderEventMixin",
     "acceleratedrendering.MeshUploadingProgramDispatcherVelocityMixin",
     "acceleratedrendering.RingBuffersVelocityMixin",

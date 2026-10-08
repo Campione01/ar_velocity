@@ -94,6 +94,7 @@ public final class VelocityLinkage {
     private static final String TRANSFORM_PROGRAM = AR + "core/programs/dispatchers/TransformProgramDispatcher$Default";
     private static final String UPLOADING_PROGRAM = AR + "core/programs/dispatchers/meshes/MeshUploadingProgramDispatcher$Default";
     private static final String BARRIER_FLAGS = AR + "core/backends/programs/BarrierFlags";
+    private static final String ITEM_CONTEXT = AR + "features/items/contexts/AcceleratedModelRenderContext";
     private static final String KEY_AND_SIZE = "(Lnet/minecraft/resources/ResourceLocation;J)V";
     private static final String ELEMENT = "Lcom/mojang/blaze3d/vertex/VertexFormatElement;";
 
@@ -108,6 +109,9 @@ public final class VelocityLinkage {
             new Member(Kind.STATIC_FIELD, CAPTURED_STATE, "INSTANCE", "L" + CAPTURED_STATE + ";", null),
             new Member(Kind.METHOD, CAPTURED_STATE, "getGbufferModelView", "()Lorg/joml/Matrix4fc;", null),
             new Member(Kind.TYPE, AR + "features/entities/AcceleratedEntityShadowRenderer", null, null, null),
+            // and which stack an item model is drawn for
+            new Member(Kind.TYPE, ITEM_CONTEXT, null, null, null),
+            new Member(Kind.METHOD, ITEM_CONTEXT, "layerColors", "()L" + AR + "features/items/colors/ILayerColors;", null),
             // VelocitySidecar: the entity format and the vertex layout Accelerated Rendering derives from it
             new Member(Kind.STATIC_FIELD, IRIS + "vertices/IrisVertexFormats", "ENTITY", "Lcom/mojang/blaze3d/vertex/VertexFormat;", null),
             new Member(Kind.METHOD, LAYOUT, "getSize", "()J", null),
