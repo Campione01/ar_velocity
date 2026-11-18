@@ -4,7 +4,7 @@ license = "GPL-3.0"
 
 [[mods]]
 modId = "ar_velocity"
-version = "0.1.4"
+version = "0.1.5"
 displayName = "AR Velocity"
 credits = "187J3X1-114514, author of Super Resolution and of the original Iris velocity extension; Argon4W, author of Accelerated Rendering (MIT License), two of whose Iris entity compute shaders are modified here"
 description = '''
@@ -12,7 +12,10 @@ Adds the per-vertex motion vector attribute at_velocity to what Accelerated Rend
 compute shaders with an Iris shader pack that reads it: entities, block entities and the items they carry.
 No vertex format is changed: the motion vectors live in a buffer of their own that is attached to vertex
 attribute 9. With a shader pack that does not read the attribute Accelerated Rendering is left as it is.
-Client only. Needs Accelerated Rendering 1.0.14 and Iris. Start with -Darvelocity.disable=true to switch it off.
+Client only. Needs Iris and Accelerated Rendering; verified with Accelerated Rendering 1.0.14 and 1.0.16. With any
+other build of Accelerated Rendering the game starts, but this mod stays inert: no motion vectors, and one line in the
+log that says why (-Darvelocity.anyArVersion=true leaves the decision to its check of the classes it uses). Start with
+-Darvelocity.disable=true to switch it off.
 '''
 
 [[mixins]]
@@ -21,7 +24,7 @@ config = "ar_velocity.mixins.json"
 [[dependencies.ar_velocity]]
 modId = "acceleratedrendering"
 type = "required"
-versionRange = "[1.0.14-1.21.1-alpha]"
+versionRange = "[1.0.14-1.21.1-alpha,)"
 ordering = "AFTER"
 side = "CLIENT"
 

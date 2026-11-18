@@ -15,7 +15,7 @@ AR Velocity computes the motion vector where the vertex is transformed, in the s
 ## Supported Environment
 
 - Minecraft 1.21.1, NeoForge 21.1.x, Java 21. Client only.
-- Accelerated Rendering 1.0.14, exactly the build `1.0.14-1.21.1-alpha`.
+- Accelerated Rendering 1.0.14 or 1.0.16 (the builds `1.0.14-1.21.1-alpha` and `1.0.16-1.21.1-alpha`). With any other build the game starts and the mod stays inert; see Settings.
 - Iris 1.8.x for NeoForge.
 - Super Resolution 0.9.2 with `enable_iris_extension = true` in the root of its config.
 - A shader pack that reads `at_velocity` behind the macros `SR_IRIS_EXT_ENABLED` / `SR_IRIS_EXT_VELOCITY`.
@@ -24,7 +24,7 @@ AR Velocity computes the motion vector where the vertex is transformed, in the s
 ## Installation
 
 1. Install the mods listed above and set `enable_iris_extension = true` in the config of Super Resolution.
-2. Place `ar_velocity-0.1.4.jar` in the client's `mods` directory. SHA-256 of the released jar: `091dc165f34c37d63f20edeb8534be37d1abdcfa49eeab44e543e7284bb82ea5`.
+2. Place `ar_velocity-0.1.5.jar` in the client's `mods` directory. SHA-256 of the released jar: `ee8e6a72c1c7b6d7384cebb649f69b3f1349a65a2a296f60b82e4ab69f79523e`.
 3. Start the game and select a shader pack that reads `at_velocity`.
 
 The log then holds, among others, these lines:
@@ -41,13 +41,16 @@ The third line comes once, when a world is first entered. `ar_velocity: no progr
 
 The following lines are logged once each, when something is not as usual:
 
-- An error that contains `no motion vectors` (it begins with `ar_velocity: inert`, `ar_velocity: inactive` or `ar_velocity: no motion vectors from now on`) says what the mod did not find in the installed Iris or Accelerated Rendering as this build expects it. The mod then writes no motion vectors.
+- An error that contains `no motion vectors` (it begins with `ar_velocity: inert`, `ar_velocity: inactive` or `ar_velocity: no motion vectors from now on`) says what the mod did not find in the installed Iris or Accelerated Rendering as this build expects it, or that the installed Accelerated Rendering is not a build this version is verified with. The mod then writes no motion vectors.
 - The warnings `ar_velocity: the level is drawn more than once in a frame ...` and `ar_velocity: a frame of the game had a level render, but none made by the game's own call ...` say that the level is drawn a second time in a frame, or not by the game's own call; see Known Limitations.
 - The information line `ar_velocity: a renderer (..., for ...) draws in more than one compute cycle of a frame` and the warning that a later draw `turned out to be that draw` are explained under Known Limitations as well.
 
 ## Settings
 
-There is no config file. The JVM argument `-Darvelocity.disable=true` switches the mod off: no mixin is applied and nothing else of the mod runs.
+There is no config file. Two JVM arguments exist:
+
+- `-Darvelocity.disable=true` switches the mod off: no mixin is applied and nothing else of the mod runs.
+- `-Darvelocity.anyArVersion=true` lets the mod work with a build of Accelerated Rendering it is not verified with. Without it the mod stays inert on such a build and logs one error that names the installed version. With it, only the check of the members the mod uses decides; that check does not prove that the build draws the same way, so look at the picture before relying on it.
 
 ## How It Works
 
@@ -72,7 +75,7 @@ Measured on one machine, not a benchmark: under DLSS through Super Resolution 0.
 
 ## Known Limitations
 
-- The mod works with one build of Accelerated Rendering and refers to internals of it and of Iris. The mod loader refuses another Accelerated Rendering version; if a member the mod uses is missing in the installed Iris or Accelerated Rendering, the mod stays inert and logs one error.
+- The mod refers to internals of Accelerated Rendering and of Iris and is verified with two builds of Accelerated Rendering, 1.0.14 and 1.0.16. With any other build it stays inert and logs one error, unless `-Darvelocity.anyArVersion=true` is given; the mod loader no longer refuses the version, as it did up to 0.1.4. If a member the mod uses is missing in the installed Iris or Accelerated Rendering, the mod stays inert and logs one error.
 - Only one view gets motion vectors: the level render the game itself makes in a frame. A second view drawn before, after or inside it (another camera, a portal, a mirror, a panorama) gets none and does not take them from the player's view. A mod that makes the game's own call twice in a frame makes two such renders, which nothing tells apart: the first is followed, and when that is the mod's view, the player's view gets no motion vectors; when the mod does so only in some frames, motion vectors can be false in the frames around each change. In a frame in which the game's own call is not made, the level render that starts first is followed, with one warning; the first such frame after frames with the game's own call gets no motion vectors, and neither does the first frame after each change between the two.
 - A draw that goes more than 8 blocks in one frame (a teleport) and every draw in a frame that begins more than one second of real time after the one before it, at any tick rate, get no motion vector for that frame.
 - A motion vector can be false for one frame in three cases:
@@ -81,6 +84,7 @@ Measured on one machine, not a benchmark: under DLSS through Super Resolution 0.
   - A new thing that a renderer draws at an earlier point of the frame than the old one and within 4 blocks of it, when the two draws reach the compute programs in different compute cycles of the frame, so that the first can no longer be taken back. A compute cycle ends each time Accelerated Rendering hands the draws it has collected to its compute programs, which can be more than once in a frame.
 - An item on a block entity gets no motion vector for a frame in which the block entity reads its stacks again while the item moves abruptly: the equal stack in another object cannot be told from the next item taking its place.
 - The blob shadow under an entity gets no motion vector.
+- Seen while testing, and not caused by this mod: in one test setup Accelerated Rendering 1.0.16 ended the second resource reload of a session (F3+T pressed twice) with `Buffer has been freed` in the log and returned the player to the title screen. This happened with this mod installed and without it.
 - Once per session the log may warn that the first draw of a renderer was given a motion vector and a draw of a later compute cycle "turned out to be that draw". That is the third case above: one draw had a false motion vector in one frame, and for that owner the renderer is held to the rules for several draws from then on. The information line about a renderer that "draws in more than one compute cycle of a frame" does not mean that anything went wrong.
 
 ## Build
@@ -92,15 +96,16 @@ See [BUILDING.md](BUILDING.md). The changes of each version are in [CHANGELOG.md
 AR Velocity is licensed under the [GNU General Public License, version 3](LICENSE); the source files allow any later version as well.
 
 - The motion vector math is adapted from the Iris velocity extension of Super Resolution by 187J3X1-114514, which is licensed under the GPL version 3.
-- The two compute shaders are modified copies of shaders of Accelerated Rendering 1.0.14 by Argon4W, which is distributed under the MIT License; see [LICENSE-AcceleratedRendering.txt](src/main/resources/LICENSE-AcceleratedRendering.txt).
+- The two compute shaders are modified copies of shaders of Accelerated Rendering 1.0.14 by Argon4W (the originals are the same files in 1.0.16), which is distributed under the MIT License; see [LICENSE-AcceleratedRendering.txt](src/main/resources/LICENSE-AcceleratedRendering.txt).
 
 ## 简体中文
 
 AR Velocity（`ar_velocity`）是一个仅客户端的 NeoForge 1.21.1 模组。它为 Accelerated Rendering 通过计算着色器绘制的实体、方块实体及其携带的物品提供逐顶点运动矢量属性 `at_velocity`，供 Iris 光影包读取，用来消除 DLSS、FSR、TAA 等时域超分辨率和抗锯齿下移动实体的拖影。
 
-- 需要：Minecraft 1.21.1、NeoForge 21.1.x、Accelerated Rendering 1.0.14（`1.0.14-1.21.1-alpha`）、Iris 1.8.x、Super Resolution 0.9.2（配置文件根部设置 `enable_iris_extension = true`），以及在宏 `SR_IRIS_EXT_ENABLED` / `SR_IRIS_EXT_VELOCITY` 下读取 `at_velocity` 的光影包。
-- 安装：把 `ar_velocity-0.1.4.jar` 放进客户端的 `mods` 文件夹。发布的 jar 文件的 SHA-256 为 `091dc165f34c37d63f20edeb8534be37d1abdcfa49eeab44e543e7284bb82ea5`。
+- 需要：Minecraft 1.21.1、NeoForge 21.1.x、Accelerated Rendering 1.0.14 或 1.0.16（`1.0.14-1.21.1-alpha`、`1.0.16-1.21.1-alpha`）、Iris 1.8.x、Super Resolution 0.9.2（配置文件根部设置 `enable_iris_extension = true`），以及在宏 `SR_IRIS_EXT_ENABLED` / `SR_IRIS_EXT_VELOCITY` 下读取 `at_velocity` 的光影包。
+- 安装：把 `ar_velocity-0.1.5.jar` 放进客户端的 `mods` 文件夹。发布的 jar 文件的 SHA-256 为 `ee8e6a72c1c7b6d7384cebb649f69b3f1349a65a2a296f60b82e4ab69f79523e`。
 - 关闭：加上 JVM 参数 `-Darvelocity.disable=true`。
+- 其他版本的 Accelerated Rendering：游戏可以正常启动，本模组自动停用（不写入运动矢量），并在日志中输出一条说明已安装版本的错误信息；0.1.4 及更早的版本会让游戏无法启动。加上 JVM 参数 `-Darvelocity.anyArVersion=true` 可以跳过版本检查，只由模组对所用类成员的检查来决定，使用前请先确认画面正常。
 - 不修改任何顶点格式；光影包不读取该属性时，Accelerated Rendering 保持原样运行。
 - 许可证：GPL-3.0。运动矢量的算法改编自 Super Resolution 的 Iris velocity 扩展；两个计算着色器修改自 Accelerated Rendering（MIT 许可证）。
 - 这是非官方的社区模组，与上述项目无关，也未获得它们的认可；出现问题请不要向这些项目反馈。

@@ -20,6 +20,7 @@
 package arvelocity;
 
 import net.neoforged.fml.loading.LoadingModList;
+import net.neoforged.neoforgespi.language.IModInfo;
 import org.objectweb.asm.tree.ClassNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,15 +34,24 @@ import java.util.Set;
 
 /**
  * The switch of the mod. Without Accelerated Rendering and Iris, or with -Darvelocity.disable=true, no mixin
- * is applied and nothing else of this mod ever runs. When the installed Iris or Accelerated Rendering lacks
- * something this build refers to (VelocityLinkage), the mod is inert: Accelerated Rendering is left as it is
- * and no motion vector is written. The one mixin that still applies then needs neither mod: it keeps
+ * is applied and nothing else of this mod ever runs. With a build of Accelerated Rendering this build of the
+ * mod has not been verified with (VERIFIED_AR_VERSIONS), or when the installed Iris or Accelerated Rendering
+ * lacks something this build refers to (VelocityLinkage), the mod is inert: Accelerated Rendering is left as it
+ * is and no motion vector is written. The one mixin that still applies then needs neither mod: it keeps
  * at_velocity on its fixed attribute location, where nothing feeds it and shader packs read "no data".
+ * -Darvelocity.anyArVersion=true lifts the version check and leaves the decision to VelocityLinkage.
  */
 public class ArVelocityMixinPlugin implements IMixinConfigPlugin {
     private static final Logger LOGGER = LoggerFactory.getLogger("ar_velocity");
 
     private static final String ATTRIBUTE_MIXIN = ".vanilla.ShaderInstanceVelocityMixin";
+
+    private static final String AR_MOD_ID = "acceleratedrendering";
+
+    /** The versions of Accelerated Rendering, as its mods.toml states them, that this build has been verified with. */
+    public static final List<String> VERIFIED_AR_VERSIONS = List.of("1.0.14-1.21.1-alpha", "1.0.16-1.21.1-alpha");
+
+    public static final String ANY_AR_VERSION_PROPERTY = "arvelocity.anyArVersion";
 
     private boolean apply;
     private boolean inert;
@@ -49,13 +59,27 @@ public class ArVelocityMixinPlugin implements IMixinConfigPlugin {
     @Override
     public void onLoad(String mixinPackage) {
         boolean disabled = Boolean.getBoolean("arvelocity.disable");
-        boolean acceleratedRendering = isLoaded("acceleratedrendering");
+        boolean acceleratedRendering = isLoaded(AR_MOD_ID);
         boolean iris = isLoaded("iris");
         apply = !disabled && acceleratedRendering && iris;
         if (!apply) {
             LOGGER.info("ar_velocity: no mixin is applied (-Darvelocity.disable: {}, Accelerated Rendering present: {}, Iris present: {})",
                     disabled, acceleratedRendering, iris);
             return;
+        }
+        String version = installedVersion(AR_MOD_ID);
+        if (version == null || !VERIFIED_AR_VERSIONS.contains(version)) {
+            String installed = version == null ? "of a version that could not be read" : "version " + version;
+            if (!Boolean.getBoolean(ANY_AR_VERSION_PROPERTY)) {
+                inert = true;
+                LOGGER.error("ar_velocity: inert, no motion vectors: the installed Accelerated Rendering is {}, and this build of ar_velocity is verified "
+                        + "only with {}. Accelerated Rendering is left unchanged; only the binding of at_velocity to its attribute location stays. "
+                        + "Start with -D{}=true to let the check of the classes this build uses decide instead", installed,
+                        String.join(" and ", VERIFIED_AR_VERSIONS), ANY_AR_VERSION_PROPERTY);
+                return;
+            }
+            LOGGER.warn("ar_velocity: the installed Accelerated Rendering is {}, not one this build is verified with ({}); -D{}=true lifts that check, "
+                    + "and the check of the classes this build uses decides alone", installed, String.join(", ", VERIFIED_AR_VERSIONS), ANY_AR_VERSION_PROPERTY);
         }
         VelocityLinkage.Member missing = missingMember();
         inert = missing != null;
@@ -69,6 +93,20 @@ public class ArVelocityMixinPlugin implements IMixinConfigPlugin {
 
     private static boolean isLoaded(String modId) {
         return LoadingModList.get().getModFileById(modId) != null;
+    }
+
+    /** The version the mod loader has read for the mod, or null when there is none to read. */
+    private static String installedVersion(String modId) {
+        try {
+            for (IModInfo mod : LoadingModList.get().getModFileById(modId).getMods()) {
+                if (modId.equals(mod.getModId())) {
+                    return mod.getVersion().toString();
+                }
+            }
+        } catch (RuntimeException | LinkageError e) {
+            LOGGER.debug("ar_velocity: the version of {} could not be read", modId, e);
+        }
+        return null;
     }
 
     private static VelocityLinkage.Member missingMember() {

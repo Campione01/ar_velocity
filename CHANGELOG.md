@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- Works with Accelerated Rendering 1.0.16 (`1.0.16-1.21.1-alpha`) as well as 1.0.14. How motion vectors are computed has not changed.
+- The mod loader no longer refuses another version of Accelerated Rendering: the dependency is `1.0.14-1.21.1-alpha` or newer. Up to 0.1.4 the game did not start once Accelerated Rendering had been updated.
+- With a build of Accelerated Rendering this version is not verified with, the game starts and the mod stays inert: only the binding of `at_velocity` to vertex attribute 9 is applied, no motion vectors are written, Accelerated Rendering is left as it is, and one error in the log names the installed version and the verified ones.
+- New JVM argument `-Darvelocity.anyArVersion=true`: lifts that version check, so that only the check of the members of Iris and Accelerated Rendering the mod uses decides.
+
 ## 0.1.4
 
 - Two frames are compared by the game's own timer. A frame that is long because the game ticks long is no longer taken for long one frame early. The timer is counted in every frame, also in one in which another mod has switched the level render off (a map screen).

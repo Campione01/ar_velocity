@@ -82,7 +82,7 @@ public final class VelocitySidecar {
     }
 
     /**
-     * True when the Iris entity format is the one Accelerated Rendering 1.0.14 builds, with attribute 9 free.
+     * True when the Iris entity format is the one Accelerated Rendering 1.0.14 and 1.0.16 build, with attribute 9 free.
      * This decides whether velocities are written; the attribute location is bound without it (VelocityAttribute).
      */
     public static boolean supported() {
@@ -103,7 +103,7 @@ public final class VelocitySidecar {
         }
         boolean fits = entity.getVertexSize() == VERTEX_SIZE && entity.getElements().size() <= ATTRIBUTE;
         if (!fits) {
-            refusal = "ar_velocity: inactive, no motion vectors; expected the " + VERTEX_SIZE + "-byte Iris entity vertex format of Accelerated Rendering 1.0.14 "
+            refusal = "ar_velocity: inactive, no motion vectors; expected the " + VERTEX_SIZE + "-byte Iris entity vertex format of Accelerated Rendering 1.0.14 and 1.0.16 "
                     + "with at most " + ATTRIBUTE + " elements, found " + entity.getVertexSize() + " bytes and " + entity.getElements().size() + " elements\n" + entity;
         }
         return fits;
